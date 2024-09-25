@@ -56,6 +56,7 @@ typedef struct main_info
     t_fork    *forks;
 
     t_mtx   synchro;
+    t_mtx   synchro1;
 
     int     died;
     int     even;

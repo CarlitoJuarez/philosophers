@@ -14,8 +14,8 @@ SRC_MAIN	= philosophers.c
 PATH_MAIN	= $(addprefix $(DIR_MAIN), $(SRC_MAIN))
 
 # UTILS
-DIR_UTILS	= utils/
 SRC_UTILS	= util_1.c
+DIR_UTILS	= utils/
 PATH_UTILS	= $(addprefix $(DIR_UTILS), $(SRC_UTILS))
 
 # OBJECTS

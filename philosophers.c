@@ -17,30 +17,35 @@ int check_in(char **arr)
     return (1);
 }
 
+void print_timestamp_fork(t_philo *philo, int fork_id)
+{
+    t_time cur;
+
+    gettimeofday(&cur, NULL);
+    pthread_mutex_lock(&philo->main->synchro);
+    printf("%d: %d has taken a fork: %d\n", ((int)cur.tv_sec * 1000 + (int)cur.tv_usec / 1000) % 10000, philo->id, fork_id);
+    pthread_mutex_unlock(&philo->main->synchro);
+}
 
 void eat(t_philo *philo)
 {
     t_time cur;
 
-    // gettimeofday(&cur, NULL);
-    // printf("%d: %d MEALS: %d\n", (int)cur.tv_sec * 1000 + (int)cur.tv_usec / 1000, philo->id, philo->meals);
     if (philo->meals)
     {
         pthread_mutex_lock(&philo->left->fork);
-        gettimeofday(&cur, NULL);
-        printf("%d: %d has taken a fork: %d\n", ((int)cur.tv_sec * 1000 + (int)cur.tv_usec / 1000) % 10000, philo->id, philo->left->fork_id);
+        print_timestamp_fork(philo, philo->left->fork_id);
         pthread_mutex_lock(&philo->right->fork);
-        gettimeofday(&cur, NULL);
-        printf("%d: %d has taken a fork: %d\n", ((int)cur.tv_sec * 1000 + (int)cur.tv_usec / 1000) % 10000, philo->id, philo->right->fork_id);
+        print_timestamp_fork(philo, philo->right->fork_id);
         (philo->eaten) = 1;
+        pthread_mutex_lock(&philo->main->synchro);
+        gettimeofday(&cur, NULL);
         printf("%d: %d is eating\n", ((int)cur.tv_sec * 1000 + (int)cur.tv_usec / 1000) % 10000, philo->id);
+        pthread_mutex_unlock(&philo->main->synchro);
         usleep(philo->main->eat * 1000);
         pthread_mutex_unlock(&philo->left->fork);
-        gettimeofday(&cur, NULL);
-        // printf("%d: %d has released a fork: %d\n", (int)current_time.tv_usec / 1000, philo->id, philo->left->fork_id);
         pthread_mutex_unlock(&philo->right->fork);
         gettimeofday(&cur, NULL);
-        // printf("%d: %d has released a fork: %d\n", (int)current_time.tv_usec / 1000, philo->id, philo->right->fork_id);
         (philo->last_meal) = (int)cur.tv_sec * 1000 + (int)cur.tv_usec / 1000;
         philo->meals--;
     }
@@ -51,10 +56,6 @@ int time_up(t_philo *philo)
     t_time cur;
 
     gettimeofday(&cur, NULL);
-    // if (philo->id == 0)
-        // printf("%d: %d DIE: %d + LAST: %d < CUR: %d \n", (int)current_time.tv_usec / 1000, philo->id, philo->main->die, *(philo->last_meal), (int)current_time.tv_usec / 1000);
-    // printf("last: %d\n", *(philo->last_meal));
-    // printf("time: %d\n", (int)current_time.tv_usec / 1000);
     if ((philo->main->die) + (philo->last_meal) <= (int)cur.tv_sec * 1000 + (int)cur.tv_usec / 1000)
         return (1);
     return (0);
@@ -66,9 +67,10 @@ int sleeping(t_philo *philo)
     t_time timestamp;
 
     gettimeofday(&cur, NULL);
+    pthread_mutex_lock(&philo->main->synchro);
     printf("%d: %d sleeping..\n", ((int)cur.tv_sec * 1000 + (int)cur.tv_usec / 1000) % 10000, philo->id);
+    pthread_mutex_unlock(&philo->main->synchro);
     gettimeofday(&timestamp, NULL);
-    // printf("SLEEP: %d\n", philo->main->sleep);
     while ((int)cur.tv_sec * 1000 + (int)cur.tv_usec / 1000 < (int)timestamp.tv_sec * 1000 + (int)timestamp.tv_usec / 1000 + philo->main->sleep)
     {
         if (time_up(philo))
@@ -84,7 +86,9 @@ int thinking(t_philo *philo)
     t_time cur;
 
     gettimeofday(&cur, NULL);
+    pthread_mutex_lock(&philo->main->synchro);
     printf("%d: %d thinking..\n", ((int)cur.tv_sec * 1000 + (int)cur.tv_usec / 1000) % 10000, philo->id);
+    pthread_mutex_unlock(&philo->main->synchro);
     return (1);
 }
 
@@ -93,7 +97,37 @@ void die(t_philo *philo)
     t_time cur;
 
     gettimeofday(&cur, NULL);
+    pthread_mutex_lock(&philo->main->synchro);
     printf("%d: %d died..\n", ((int)cur.tv_sec * 1000 + (int)cur.tv_usec / 1000) % 10000, philo->id);
+    philo->main->died = 1;
+    pthread_mutex_unlock(&(philo->main->synchro));
+}
+
+int read_died(t_philo *philo)
+{
+    int died;
+
+    pthread_mutex_lock(&(philo->main->synchro));
+    died = philo->main->died;
+    pthread_mutex_unlock(&(philo->main->synchro));
+    return (died);
+}
+
+int read_even(t_philo *philo)
+{
+    int even;
+
+    pthread_mutex_lock(&(philo->main->synchro));
+    even = philo->main->even;
+    pthread_mutex_unlock(&(philo->main->synchro));
+    return (even);
+}
+
+void    set_even(t_philo *philo, int val)
+{
+    pthread_mutex_lock(&(philo->main->synchro));
+    philo->main->even = val;
+    pthread_mutex_unlock(&(philo->main->synchro));
 }
 
 void *start(void *arg)
@@ -102,21 +136,21 @@ void *start(void *arg)
 
     philo = (t_philo *)arg;
 
-    while ((philo->main->died) == 0)
+    while (!read_died(philo))
     {
-        pthread_mutex_lock(&(philo->main->synchro));
-        if ((time_up(philo) && !(philo->main->died)))
-            return (die(philo), (philo->main->died) = 1, NULL);
-        pthread_mutex_unlock(&(philo->main->synchro));
+        pthread_mutex_lock(&(philo->main->synchro1));
+        if ((time_up(philo) && !read_died(philo)))
+            return (die(philo), pthread_mutex_unlock(&(philo->main->synchro1)), NULL);
+        pthread_mutex_unlock(&(philo->main->synchro1));
         if (philo->id % 2 == 0)
         {
-            (philo->main->even) = 1;
+            set_even(philo, 1);
             eat(philo);
-            (philo->main->even) = 0;
+            set_even(philo, 0);
         }
-        if (philo->id % 2 != 0 && !(philo->main->even))
+        if (philo->id % 2 != 0 && !read_even(philo))
             eat(philo);
-        if (!time_up(philo) && !(philo->main->died) 
+        if (!time_up(philo) && !read_died(philo)
                 && (philo->eaten) && sleeping(philo) && thinking(philo))
             (philo->eaten) = 0;
     }
@@ -127,26 +161,16 @@ int init_part_two(main_info **main)
 {
     t_time cur;
     int i;
-    // int *eaten;
-    // int *died;
-    // int *last_meal;
 
     i = -1;
     gettimeofday(&cur, NULL);
     while (++i < (*main)->num_philos)
     {
-        // eaten = malloc(sizeof(int));
-        // *eaten = 0;
-        // died = malloc(sizeof(int));
-        // *died = 0;
-        // last_meal = malloc(sizeof(int));
-        // *last_meal = (int)cur.tv_sec * 1000 + (int)cur.tv_usec / 1000;
         (*main)->philos[i].eaten = 0;
         (*main)->philos[i].died = 0;
         (*main)->philos[i].last_meal = (int)cur.tv_sec * 1000 + (int)cur.tv_usec / 1000;
         if (pthread_create(&(*main)->philos[i].thread_id, NULL, &start, &(*main)->philos[i]) != 0)
             return (printf("Error: pthread_create\n"), 1);
-        usleep(10);
     }
     return (0);
 }
@@ -171,7 +195,6 @@ int init_part_one(main_info **main)
         (*main)->philos[i].left = &(*main)->forks[i];
         (*main)->philos[i].right = &(*main)->forks[(i + 1) % ((*main)->num_philos)];
         (*main)->philos[i].meals = (*main)->meals;
-        // printf("PHILO: %d has left: %d and right: %d\n", (*main)->philos[i].id, ((*main)->philos[i].left->fork_id), ((*main)->philos[i].right->fork_id));
         (*main)->philos[i].main = *main;
     }
     return (0);
@@ -179,13 +202,6 @@ int init_part_one(main_info **main)
 
 int init(main_info *main, int *argv)
 {
-    // int *even;
-    // int *died;
-
-    // even = malloc(sizeof(int));
-    // *even = 1;
-    // died = malloc(sizeof(int));
-    // *died = 0;
     main->philos = malloc(sizeof(t_philo) * (argv[0]));
     if (!main->philos)
         return (1);
@@ -199,10 +215,10 @@ int init(main_info *main, int *argv)
     main->meals = argv[4];
     main->even = 1;
     main->died = 0;
-    // TODO SYNCHRO
     if (pthread_mutex_init(&main->synchro, NULL) != 0)
         return (printf("Error: pthread_mutex_init\n"), 1);
-    // END_TODO
+    if (pthread_mutex_init(&main->synchro1, NULL) != 0)
+        return (printf("Error: pthread_mutex_init\n"), 1);
     if (init_part_one(&main) != 0)
         return (1);
     if (init_part_two(&main) != 0)
@@ -223,18 +239,25 @@ void *kill_function(void *arg)
 int run_the_rest(main_info *main)
 {
     int i;
-    // pthread_t kill_thread;
-    // if (!pthread_create(&kill_thread, NULL, kill_function, &main))
-    //     return (0);
 
     while (!(main->died))
         ;
     i = -1;
     while (++i < main->num_philos)
-        pthread_detach(main->philos[i].thread_id);
+    {
+        if (pthread_detach(main->philos[i].thread_id) != 0)
+            return (printf("Error: pthread_detach\n"), 1);
+    }
     i = -1;
     while (++i < main->num_philos)
-        pthread_mutex_destroy(&main->philos[i].left->fork);
+    {
+        if (pthread_mutex_destroy(&main->philos[i].left->fork) != 0)
+            return (printf("Error: pthread_mutex_destroy\n"), 1);
+    }
+    if (pthread_mutex_destroy(&main->synchro) != 0)
+        return (printf("Error: pthread_mutex_destroy\n"), 1);
+    if (pthread_mutex_destroy(&main->synchro1) != 0)
+        return (printf("Error: pthread_mutex_destroy\n"), 1);
     free(main->philos);
     free(main->forks);
     return (0);
