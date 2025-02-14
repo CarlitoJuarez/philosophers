@@ -64,6 +64,8 @@ typedef struct main_info
     int     died;
     int     even;
 
+    int     tresh;
+
     int     num_philos;
     int     die;
     int     eat;

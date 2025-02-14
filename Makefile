@@ -2,7 +2,7 @@ NAME		= philosophers
 
 CC			= cc
 
-FLAGS		= -Wall -Wextra -Werror
+FLAGS		= -Wall -Wextra -Werror -lpthread
 
 RM			= rm -rf
 
