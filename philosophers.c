@@ -1,5 +1,22 @@
 #include "philosophers.h"
 
+int read_meals(t_philo *philo)
+{
+	int cur;
+
+	pthread_mutex_lock(&philo->phil_mtx);
+	cur = philo->meals;
+	pthread_mutex_unlock(&philo->phil_mtx);
+	return (cur);
+}
+
+void minus_meals(t_philo *philo)
+{
+	pthread_mutex_lock(&philo->phil_mtx);
+	philo->meals--;
+	pthread_mutex_unlock(&philo->phil_mtx);
+}
+
 int	check_in(char **arr)
 {
 	long	i;
@@ -84,41 +101,6 @@ void calc_tresh(main_info *main)
 	printf("TRESH: %d\n", main->tresh);
 }
 
-
-int minus_meals(t_philo *philo)
-{
-	if (philo->id == 0 || philo->id == 1)
-		philo->meals--;
-	return (1);
-}
-
-// int lock_forks(t_philo *philo)
-// {
-// 	if (philo->left->fork_id == philo->right->fork_id)
-// 	{
-// 		pthread_mutex_lock(&philo->left->fork);
-// 		print_timestamp_fork(philo);
-// 		return (pthread_mutex_unlock(&philo->left->fork), 0);
-// 	}
-// 	set_time(philo);
-// 	if (philo->id % 2 == 0 && !read_died(philo))
-// 	{
-// 		pthread_mutex_lock(&philo->left->fork);
-// 		pthread_mutex_lock(&philo->right->fork);
-// 	}
-// 	else if (!read_died(philo))
-// 	{
-// 		pthread_mutex_lock(&philo->right->fork);
-// 		pthread_mutex_lock(&philo->left->fork);
-// 	}
-// 	if (!read_died(philo))
-// 	{
-// 		print_timestamp_fork(philo);
-// 		print_timestamp_fork(philo);
-// 	}
-// 	return (1);
-// }
-
 int possible(t_philo *philo)
 {
 	if (philo->main->num_philos % 2 == 0 && philo->main->die > philo->main->eat + philo->main->sleep)
@@ -138,14 +120,14 @@ int lock_forks(t_philo *philo)
 		print_timestamp_fork(philo);
 		return (pthread_mutex_unlock(&philo->left->fork), 0);
 	}
-	if (philo->id % 2 == 0 && !read_died(philo))
+	if (philo->id % 2 == 0 && !read_died(philo) && read_meals(philo))
 	{
 		pthread_mutex_lock(&philo->left->fork);
 		print_timestamp_fork(philo);
 		pthread_mutex_lock(&philo->right->fork);
 		print_timestamp_fork(philo);
 	}
-	else if (!read_died(philo))
+	else if (!read_died(philo) && read_meals(philo))
 	{
 		pthread_mutex_lock(&philo->right->fork);
 		print_timestamp_fork(philo);
@@ -160,13 +142,6 @@ void	custom_usleep(long long time_in_ms,t_philo *philo)
 	long long	start_time;
 
 	start_time = get_time_in_ms();
-	// if ((philo->main->num_philos % 2 == 0 && printf("EVEN\n") && philo->main->num_philos > 100) || (philo->main->num_philos > 100 && philo->main->die > 200))
-	// if ((philo->main->num_philos % 2 == 0 && printf("EVEN\n") && philo->main->num_philos > 100) || (philo->main->die % 2 != 0 && philo->main->num_philos > 100 && philo->main->die > 200))
-	// if ((philo->main->num_philos % 2 == 0 && printf("EVEN\n") && philo->main->num_philos > 100))
-	// if (philo->main->die % 2 != 0 || (philo->main->num_philos < 100 && philo->main->die < 200))
-	// if (philo->main->num_philos % 2 == 0 || (possible(philo)))
-	// if ((possible(philo)))
-	// 	set_time(philo);
 	while (!read_died(philo)
 		&& (get_time_in_ms() - start_time) < time_in_ms)
 		usleep(100);
@@ -176,10 +151,9 @@ void	eat(t_philo *philo)
 {
 	t_time	cur;
 
-	if (philo->meals-- && !read_died(philo))
-	// if (((read_meals(philo) >= 0 && read_even(philo))
-	// 	|| read_meals(philo)) && minus_meals(philo))
+	if (read_meals(philo) && !read_died(philo))
 	{
+		minus_meals(philo);
 		lock_forks(philo);
 		gettimeofday(&cur, NULL);
 		set_time(philo);
@@ -192,32 +166,7 @@ void	eat(t_philo *philo)
 						+ (size_t)(philo->main->cur).tv_usec / 1000), philo->id);
 		}
 		pthread_mutex_unlock(&philo->main->synchro);
-		// printf("%ld: %d is eating\n", ((size_t)cur.tv_sec * 1000
-		// 	+ (size_t)cur.tv_usec / 1000) - ((size_t)(philo->main->cur).tv_sec
-		// 	* 1000 + (size_t)(philo->main->cur).tv_usec / 1000), philo->id);
-		// printf("%d: ACESSING FORK: %d\n", philo->id, philo->left->fork_id);
-		// custom_usleep(1, philo);
-		// if (philo->id % 2 == 0)
-		// printf("%d: ACESSING FORK: %d\n", philo->id, philo->right->fork_id);
-		// print_timestamp_fork(philo);
-		// (philo->eaten) = 1;
-		// pthread_mutex_lock(&philo->main->synchro);
-		// set_time(philo);
-		// gettimeofday(&cur, NULL);
-		// if (!read_died(philo))
-		// {
-		// }
-		// pthread_mutex_unlock(&philo->main->synchro);
-		// if (philo->main->num_philos % 2 == 0)
-		// 	set_time(philo);
 		custom_usleep(philo->main->eat, philo);
-		// if ((possible(philo)))
-		// 	set_time(philo);
-		// usleep(philo->main->eat * 1000);
-		// set_time(philo);
-
-		// printf("EAT FOR: %d\n", philo->main->eat * 1000);
-		// printf("PHILO: %d | LAST MEAL: %ld\n", philo->id, phi	lo->last_meal);
 		pthread_mutex_unlock(&philo->right->fork);
 		pthread_mutex_unlock(&philo->left->fork);
 	}
@@ -233,22 +182,6 @@ int	read_died(t_philo *philo)
 	return (died);
 }
 
-// void	die(t_philo *philo)
-// {
-// 	t_time	cur;
-
-// 	gettimeofday(&cur, NULL);
-// 	if (!read_died(philo))
-// 	{
-// 		pthread_mutex_lock(&philo->main->died_mtx);
-// 		printf("%ld: %d died\n", ((size_t)cur.tv_sec * 1000
-// 		+ (size_t)cur.tv_usec / 1000) - ((size_t)(philo->main->cur).tv_sec
-// 			* 1000 + (size_t)(philo->main->cur).tv_usec / 1000), philo->id);
-// 		philo->main->died = 1;
-// 		pthread_mutex_unlock(&(philo->main->died_mtx));
-// 	}
-// }
-
 int	time_up(t_philo *philo)
 {
 	t_time	cur;
@@ -258,8 +191,14 @@ int	time_up(t_philo *philo)
 					- ((size_t)(philo->main->cur).tv_sec * 1000 + (size_t)(philo->main->cur).tv_usec / 1000)
 					> (((size_t)(philo->last_meal))
 					- ((size_t)(philo->main->cur).tv_sec * 1000 + (size_t)(philo->main->cur).tv_usec / 1000)
-					+ philo->main->die + 5))
-		return (pthread_mutex_unlock(&(philo->main->synchro)), 1);
+					+ philo->main->die + philo->main->tresh))
+		return (
+			printf("THIS: %lu > %lu\n", ((size_t)cur.tv_sec * 1000 + (size_t)cur.tv_usec / 1000)
+					- ((size_t)(philo->main->cur).tv_sec * 1000 + (size_t)(philo->main->cur).tv_usec / 1000)
+					, (((size_t)(philo->last_meal))
+					- ((size_t)(philo->main->cur).tv_sec * 1000 + (size_t)(philo->main->cur).tv_usec / 1000)
+					+ philo->main->die + philo->main->tresh)),
+			pthread_mutex_unlock(&(philo->main->synchro)), 1);
 	pthread_mutex_unlock(&(philo->main->synchro));
 	return (0);
 }
@@ -304,24 +243,6 @@ int	thinking(t_philo *philo)
 	return (1);
 }
 
-
-// int	read_even(t_philo *philo)
-// {
-// 	int	even;
-
-// 	pthread_mutex_lock(&(philo->main->synchro));
-// 	even = philo->main->even;
-// 	pthread_mutex_unlock(&(philo->main->synchro));
-// 	return (even);
-// }
-
-// void	set_even(t_philo *philo, int val)
-// {
-// 	pthread_mutex_lock(&(philo->main->synchro));
-// 	philo->main->even = val;
-// 	pthread_mutex_unlock(&(philo->main->synchro));
-// }
-
 void	ft_usleep(long long time_in_ms)
 {
 	long long	start_time;
@@ -339,37 +260,6 @@ void	initial_delay(t_philo *philo)
 		ft_usleep(200);
 }
 
-// int	read_meals(t_philo *philo)
-// {
-// 	int i;
-
-// 	i = philo->meals;
-// 	return (i);
-// }
-
-
-// int	handle_meals(t_philo *philo)
-// {
-// 	if (!philo->meals)
-// 	{
-// 		pthread_mutex_lock(&(philo->main->synchro));
-// 		philo->main->died = 1;
-// 		pthread_mutex_unlock(&(philo->main->synchro));
-// 		return (0);
-// 	}
-// 	return (1);
-// }
-
-// void	handle_eat(t_philo *philo, int even)
-// {
-// 	if (even)
-// 	{
-// 		set_even(philo, 1);
-// 		eat(philo);
-// 		set_even(philo, 0);
-// 	}
-// }
-
 void *start(void *arg)
 {
 	t_philo *philo;
@@ -378,11 +268,11 @@ void *start(void *arg)
 	pthread_mutex_lock(&(philo->main->start));
 	pthread_mutex_unlock(&(philo->main->start));
 	initial_delay(philo);
-	while (!read_died(philo) && philo->meals)
+	while (!read_died(philo) && read_meals(philo))
 	{
-		printf("MEALS%d: %d\n",philo->id, philo->meals);
+		// printf("MEALS%d: %d\n",philo->id, philo->meals);
 		eat(philo);
-		if (!read_died(philo) && philo->meals
+		if (!read_died(philo) && read_meals(philo)
 				&& sleeping(philo))
 			thinking(philo);
 	}
@@ -427,6 +317,8 @@ int init_part_one(main_info **main)
 	{
 		(*main)->forks[i].fork_id = i + 1;
 		if (pthread_mutex_init(&(*main)->forks[i].fork, NULL) != 0)
+			return (printf("Error: pthread_mutex_init\n"), 1);
+		if (pthread_mutex_init(&(*main)->philos[i].phil_mtx, NULL) != 0)
 			return (printf("Error: pthread_mutex_init\n"), 1);
 	}
 	i = -1;
@@ -483,17 +375,19 @@ int	check_died(main_info *main)
 {
 	int i;
 	int count;
+	int cur_meals;
 	t_time	cur;
 
 	i = -1;
 	count = main->num_philos;
 	while (++i < main->num_philos && count)
 	{
-		if (main->philos[i].meals == 0)
+		cur_meals = read_meals(&main->philos[i]);
+		if (!cur_meals)
 			count--;
 		if (!count)
-			break;
-		if (main->philos[i].meals && time_up(&main->philos[i]))
+			return (1);
+		if (time_up(&main->philos[i]) && cur_meals)
 		{
 			gettimeofday(&cur, NULL);
 			printf("%ld: %d died\n", ((size_t)cur.tv_sec * 1000
@@ -527,6 +421,8 @@ int run_the_rest(main_info *main)
 	{
 		// printf("Destroy %d\n", main->philos[i].left->fork_id);
 		if (pthread_mutex_destroy(&main->philos[i].left->fork) != 0)
+			return (1);
+		if (pthread_mutex_destroy(&main->philos[i].phil_mtx) != 0)
 			return (1);
 	}
 	if (pthread_mutex_destroy(&main->synchro) != 0)
