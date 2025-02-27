@@ -60,6 +60,7 @@ typedef struct main_info
     t_mtx   even_mtx;
     t_mtx   died_mtx;
     t_mtx   meals_mtx;
+    t_mtx   start;
 
     int     died;
     int     even;

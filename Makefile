@@ -1,9 +1,8 @@
-NAME		= philosophers
+NAME		= philo
 
 CC			= cc
 
-FLAGS		= -Wall -Wextra -Werror -lpthread
-
+FLAGS		= -Wall -Wextra -Werror -g -pthread
 RM			= rm -rf
 
 HEADER		= philosophers.h
@@ -36,7 +35,7 @@ $(DIR_OBJ)%.o: $(DIR_UTILS)%.c $(HEADER) Makefile
 
 #Linking
 $(NAME): $(SRC_OBJ)
-	@$(CC) $(SRC_OBJ) -o $(NAME)
+	@$(CC) $(SRC_OBJ) -o $(NAME) $(FLAGS)
 
 
 all: $(NAME)

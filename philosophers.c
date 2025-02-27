@@ -22,8 +22,10 @@ int set_time(t_philo *philo)
 	t_time cur;
 
 	gettimeofday(&cur, NULL);
+	pthread_mutex_lock(&philo->main->synchro);
 	philo->last_meal = ((size_t)cur.tv_sec * 1000
 		+ (size_t)cur.tv_usec / 1000);
+	pthread_mutex_unlock(&philo->main->synchro);
 	// printf("SET_TIME %d: %ld\n", philo->id, philo->last_meal - ((size_t)(philo->main->cur).tv_sec * 1000
 	// 			+ (size_t)(philo->main->cur).tv_usec / 1000));
 	return (1);
@@ -31,8 +33,10 @@ int set_time(t_philo *philo)
 
 void set_start(t_philo *philo)
 {
+	pthread_mutex_lock(&philo->main->synchro);
 	philo->last_meal = ((size_t)philo->main->cur.tv_sec * 1000
 		+ (size_t)philo->main->cur.tv_usec / 1000);
+	pthread_mutex_unlock(&philo->main->synchro);
 	// printf("SET_TIME %d: %ld\n", philo->id, philo->last_meal - ((size_t)(philo->main->cur).tv_sec * 1000
 	// 			+ (size_t)(philo->main->cur).tv_usec / 1000));
 }
@@ -42,12 +46,12 @@ void	print_timestamp_fork(t_philo *philo)
 	t_time	cur;
 
 	gettimeofday(&cur, NULL);
-	// pthread_mutex_lock(&philo->main->synchro);
+	pthread_mutex_lock(&philo->main->synchro);
 	printf("%ld: %d has taken a fork\n", ((size_t)cur.tv_sec
 		* 1000 + (size_t)cur.tv_usec / 1000)
 			- ((size_t)(philo->main->cur).tv_sec * 1000
 				+ (size_t)(philo->main->cur).tv_usec / 1000), philo->id);
-	// pthread_mutex_unlock(&philo->main->synchro);
+	pthread_mutex_unlock(&philo->main->synchro);
 }
 
 long long	get_time_in_ms(void)
@@ -58,25 +62,6 @@ long long	get_time_in_ms(void)
 	return ((tv.tv_sec * 1000LL) + (tv.tv_usec / 1000));
 }
 
-int possible(t_philo *philo)
-{
-	// int tresh;
-	// int this;
-
-	// tresh = philo->main->die - (philo->main->eat * 2 + philo->main->sleep);
-	// this = tresh / 2;
-	if (philo->main->num_philos % 2 == 0 && philo->main->die > philo->main->eat + philo->main->sleep)
-		return (usleep(40000 * philo->main->tresh), 1);
-	if (philo->main->die == philo->main->eat * 2 + philo->main->sleep)
-		// return (usleep(10000), 1);
-		return (0);
-	if (philo->main->die > philo->main->eat * 2 + philo->main->sleep - philo->main->tresh)
-		return (usleep(8000 * philo->main->tresh), 1);
-
-	// if (philo->main->die > philo->main->eat * 2 + philo->main->sleep)
-	// 	return (0);
-	return (0);
-}
 
 void calc_tresh(main_info *main)
 {
@@ -87,15 +72,87 @@ void calc_tresh(main_info *main)
 	tresh_2 = main->die - (main->eat * 2 + main->sleep);
 	if (tresh_2 < 0)
 		tresh_2 = 1;
-	if (tresh_2 > 20)
-		tresh_2 = 5;
-
+	// if (tresh_2 > 40)
+	// 	tresh_2 /= (tresh_2 / 10);
 	if (main->num_philos < 10)
 		main->tresh = 1;
 	// if (main->tresh < tresh_2)
 		// main->tresh = tresh_2;
-	if (main->tresh > tresh_2)
+	printf("TRESH2: %d\n", tresh_2);
+	if (main->tresh < tresh_2)
 			main->tresh = tresh_2;
+	printf("TRESH: %d\n", main->tresh);
+}
+
+
+int minus_meals(t_philo *philo)
+{
+	if (philo->id == 0 || philo->id == 1)
+		philo->meals--;
+	return (1);
+}
+
+// int lock_forks(t_philo *philo)
+// {
+// 	if (philo->left->fork_id == philo->right->fork_id)
+// 	{
+// 		pthread_mutex_lock(&philo->left->fork);
+// 		print_timestamp_fork(philo);
+// 		return (pthread_mutex_unlock(&philo->left->fork), 0);
+// 	}
+// 	set_time(philo);
+// 	if (philo->id % 2 == 0 && !read_died(philo))
+// 	{
+// 		pthread_mutex_lock(&philo->left->fork);
+// 		pthread_mutex_lock(&philo->right->fork);
+// 	}
+// 	else if (!read_died(philo))
+// 	{
+// 		pthread_mutex_lock(&philo->right->fork);
+// 		pthread_mutex_lock(&philo->left->fork);
+// 	}
+// 	if (!read_died(philo))
+// 	{
+// 		print_timestamp_fork(philo);
+// 		print_timestamp_fork(philo);
+// 	}
+// 	return (1);
+// }
+
+int possible(t_philo *philo)
+{
+	if (philo->main->num_philos % 2 == 0 && philo->main->die > philo->main->eat + philo->main->sleep)
+		return (usleep(5000 * philo->main->tresh), 1);
+	if (philo->main->die == philo->main->eat * 2 + philo->main->sleep)
+		return (0);
+	if (philo->main->die > philo->main->eat * 2 + philo->main->sleep - philo->main->tresh)
+		return (usleep(2000 * philo->main->tresh), 1);
+	return (0);
+}
+
+int lock_forks(t_philo *philo)
+{
+	if (philo->left->fork_id == philo->right->fork_id)
+	{
+		pthread_mutex_lock(&philo->left->fork);
+		print_timestamp_fork(philo);
+		return (pthread_mutex_unlock(&philo->left->fork), 0);
+	}
+	if (philo->id % 2 == 0 && !read_died(philo))
+	{
+		pthread_mutex_lock(&philo->left->fork);
+		print_timestamp_fork(philo);
+		pthread_mutex_lock(&philo->right->fork);
+		print_timestamp_fork(philo);
+	}
+	else if (!read_died(philo))
+	{
+		pthread_mutex_lock(&philo->right->fork);
+		print_timestamp_fork(philo);
+		pthread_mutex_lock(&philo->left->fork);
+		print_timestamp_fork(philo);
+	}
+	return (1);
 }
 
 void	custom_usleep(long long time_in_ms,t_philo *philo)
@@ -108,55 +165,36 @@ void	custom_usleep(long long time_in_ms,t_philo *philo)
 	// if ((philo->main->num_philos % 2 == 0 && printf("EVEN\n") && philo->main->num_philos > 100))
 	// if (philo->main->die % 2 != 0 || (philo->main->num_philos < 100 && philo->main->die < 200))
 	// if (philo->main->num_philos % 2 == 0 || (possible(philo)))
-	if ((possible(philo)))
-		set_time(philo);
+	// if ((possible(philo)))
+	// 	set_time(philo);
 	while (!read_died(philo)
 		&& (get_time_in_ms() - start_time) < time_in_ms)
 		usleep(100);
-}
-
-int minus_meals(t_philo *philo)
-{
-	if (philo->id == 0 || philo->id == 1)
-		philo->meals--;
-	return (1);
-}
-
-int lock_forks(t_philo *philo)
-{
-	if (philo->left->fork_id == philo->right->fork_id)
-	{
-		pthread_mutex_lock(&philo->left->fork);
-		print_timestamp_fork(philo);
-		return (pthread_mutex_unlock(&philo->left->fork), 0);
-	}
-	set_time(philo);
-	if (philo->id % 2 == 0 && !read_died(philo))
-	{
-		pthread_mutex_lock(&philo->left->fork);
-		pthread_mutex_lock(&philo->right->fork);
-	}
-	else if (!read_died(philo))
-	{
-		pthread_mutex_lock(&philo->right->fork);
-		pthread_mutex_lock(&philo->left->fork);
-	}
-	if (!read_died(philo) && !time_up(philo))
-	{
-		print_timestamp_fork(philo);
-		print_timestamp_fork(philo);
-	}
-	return (1);
 }
 
 void	eat(t_philo *philo)
 {
 	t_time	cur;
 
-	if (philo->meals-- && !read_died(philo) && !time_up(philo) && lock_forks(philo))
+	if (philo->meals-- && !read_died(philo))
 	// if (((read_meals(philo) >= 0 && read_even(philo))
 	// 	|| read_meals(philo)) && minus_meals(philo))
 	{
+		lock_forks(philo);
+		gettimeofday(&cur, NULL);
+		set_time(philo);
+		pthread_mutex_lock(&philo->main->synchro);
+		if (!read_died(philo))
+		{
+			printf("%ld: %d is eating\n", ((size_t)cur.tv_sec
+				* 1000 + (size_t)cur.tv_usec / 1000)
+					- ((size_t)(philo->main->cur).tv_sec * 1000
+						+ (size_t)(philo->main->cur).tv_usec / 1000), philo->id);
+		}
+		pthread_mutex_unlock(&philo->main->synchro);
+		// printf("%ld: %d is eating\n", ((size_t)cur.tv_sec * 1000
+		// 	+ (size_t)cur.tv_usec / 1000) - ((size_t)(philo->main->cur).tv_sec
+		// 	* 1000 + (size_t)(philo->main->cur).tv_usec / 1000), philo->id);
 		// printf("%d: ACESSING FORK: %d\n", philo->id, philo->left->fork_id);
 		// custom_usleep(1, philo);
 		// if (philo->id % 2 == 0)
@@ -165,11 +203,10 @@ void	eat(t_philo *philo)
 		// (philo->eaten) = 1;
 		// pthread_mutex_lock(&philo->main->synchro);
 		// set_time(philo);
-		gettimeofday(&cur, NULL);
-		if (!read_died(philo))
-			printf("%ld: %d is eating\n", ((size_t)cur.tv_sec * 1000
-				+ (size_t)cur.tv_usec / 1000) - ((size_t)(philo->main->cur).tv_sec
-				* 1000 + (size_t)(philo->main->cur).tv_usec / 1000), philo->id);
+		// gettimeofday(&cur, NULL);
+		// if (!read_died(philo))
+		// {
+		// }
 		// pthread_mutex_unlock(&philo->main->synchro);
 		// if (philo->main->num_philos % 2 == 0)
 		// 	set_time(philo);
@@ -196,33 +233,34 @@ int	read_died(t_philo *philo)
 	return (died);
 }
 
-void	die(t_philo *philo)
-{
-	t_time	cur;
+// void	die(t_philo *philo)
+// {
+// 	t_time	cur;
 
-	gettimeofday(&cur, NULL);
-	if (!read_died(philo))
-	{
-		pthread_mutex_lock(&philo->main->died_mtx);
-		printf("%ld: %d died\n", ((size_t)cur.tv_sec * 1000
-		+ (size_t)cur.tv_usec / 1000) - ((size_t)(philo->main->cur).tv_sec
-			* 1000 + (size_t)(philo->main->cur).tv_usec / 1000), philo->id);
-		philo->main->died = 1;
-		pthread_mutex_unlock(&(philo->main->died_mtx));
-	}
-}
+// 	gettimeofday(&cur, NULL);
+// 	if (!read_died(philo))
+// 	{
+// 		pthread_mutex_lock(&philo->main->died_mtx);
+// 		printf("%ld: %d died\n", ((size_t)cur.tv_sec * 1000
+// 		+ (size_t)cur.tv_usec / 1000) - ((size_t)(philo->main->cur).tv_sec
+// 			* 1000 + (size_t)(philo->main->cur).tv_usec / 1000), philo->id);
+// 		philo->main->died = 1;
+// 		pthread_mutex_unlock(&(philo->main->died_mtx));
+// 	}
+// }
 
 int	time_up(t_philo *philo)
 {
 	t_time	cur;
-
 	gettimeofday(&cur, NULL);
+	pthread_mutex_lock(&(philo->main->synchro));
 	if (((size_t)cur.tv_sec * 1000 + (size_t)cur.tv_usec / 1000)
 					- ((size_t)(philo->main->cur).tv_sec * 1000 + (size_t)(philo->main->cur).tv_usec / 1000)
 					> (((size_t)(philo->last_meal))
 					- ((size_t)(philo->main->cur).tv_sec * 1000 + (size_t)(philo->main->cur).tv_usec / 1000)
-					+ philo->main->die))
-		return (1);
+					+ philo->main->die + 5))
+		return (pthread_mutex_unlock(&(philo->main->synchro)), 1);
+	pthread_mutex_unlock(&(philo->main->synchro));
 	return (0);
 }
 
@@ -232,16 +270,18 @@ int	sleeping(t_philo *philo)
 	t_time	timestamp;
 
 	gettimeofday(&cur, NULL);
+	pthread_mutex_lock(&(philo->main->synchro));
 	printf("%ld: %d is sleeping\n", ((size_t)cur.tv_sec
 		* 1000 + (size_t)cur.tv_usec / 1000)
 			- ((size_t)(philo->main->cur).tv_sec
 			* 1000 + (size_t)(philo->main->cur).tv_usec / 1000), philo->id);
+	pthread_mutex_unlock(&(philo->main->synchro));
 	gettimeofday(&timestamp, NULL);
 	while ((size_t)cur.tv_sec * 1000 + (size_t)cur.tv_usec / 1000
 		< (size_t)timestamp.tv_sec * 1000
 			+ (size_t)timestamp.tv_usec / 1000 + philo->main->sleep)
 	{
-		if (time_up(philo))
+		if (read_died(philo))
 			return (0);
 		gettimeofday(&cur, NULL);
 	}
@@ -255,28 +295,32 @@ int	thinking(t_philo *philo)
 	gettimeofday(&cur, NULL);
 	if (!read_died(philo))
 	{
+		pthread_mutex_lock(&(philo->main->synchro));
 		printf("%ld: %d is thinking\n", ((size_t)cur.tv_sec * 1000
 			+ (size_t)cur.tv_usec / 1000) - ((size_t)(philo->main->cur).tv_sec
 				* 1000 + (size_t)(philo->main->cur).tv_usec / 1000), philo->id);
-	}
+		pthread_mutex_unlock(&(philo->main->synchro));
+	}		
 	return (1);
 }
 
 
-int	read_even(t_philo *philo)
-{
-	int	even;
+// int	read_even(t_philo *philo)
+// {
+// 	int	even;
 
-	even = philo->main->even;
-	return (even);
-}
+// 	pthread_mutex_lock(&(philo->main->synchro));
+// 	even = philo->main->even;
+// 	pthread_mutex_unlock(&(philo->main->synchro));
+// 	return (even);
+// }
 
-void	set_even(t_philo *philo, int val)
-{
-	pthread_mutex_lock(&(philo->main->even_mtx));
-	philo->main->even = val;
-	pthread_mutex_unlock(&(philo->main->even_mtx));
-}
+// void	set_even(t_philo *philo, int val)
+// {
+// 	pthread_mutex_lock(&(philo->main->synchro));
+// 	philo->main->even = val;
+// 	pthread_mutex_unlock(&(philo->main->synchro));
+// }
 
 void	ft_usleep(long long time_in_ms)
 {
@@ -295,70 +339,53 @@ void	initial_delay(t_philo *philo)
 		ft_usleep(200);
 }
 
-int	read_meals(t_philo *philo)
-{
-	int i;
+// int	read_meals(t_philo *philo)
+// {
+// 	int i;
 
-	i = philo->meals;
-	return (i);
-}
+// 	i = philo->meals;
+// 	return (i);
+// }
 
-void	sync_simulation(t_philo *philo)
-{
-	pthread_mutex_lock(&(philo->main->synchro));
-	pthread_mutex_unlock(&(philo->main->synchro));
-	initial_delay(philo);
-}
 
-int	handle_meals(t_philo *philo)
-{
-	if (!philo->meals)
-	{
-		pthread_mutex_lock(&(philo->main->died_mtx));
-		philo->main->died = 1;
-		pthread_mutex_unlock(&(philo->main->died_mtx));
-		return (0);
-	}
-	return (1);
-}
+// int	handle_meals(t_philo *philo)
+// {
+// 	if (!philo->meals)
+// 	{
+// 		pthread_mutex_lock(&(philo->main->synchro));
+// 		philo->main->died = 1;
+// 		pthread_mutex_unlock(&(philo->main->synchro));
+// 		return (0);
+// 	}
+// 	return (1);
+// }
 
-void	handle_eat(t_philo *philo, int even)
-{
-	if (even)
-	{
-		set_even(philo, 1);
-		eat(philo);
-		set_even(philo, 0);
-	}
-}
-
+// void	handle_eat(t_philo *philo, int even)
+// {
+// 	if (even)
+// 	{
+// 		set_even(philo, 1);
+// 		eat(philo);
+// 		set_even(philo, 0);
+// 	}
+// }
 
 void *start(void *arg)
 {
 	t_philo *philo;
 
 	philo = (t_philo *)arg;
-	sync_simulation(philo);
+	pthread_mutex_lock(&(philo->main->start));
+	pthread_mutex_unlock(&(philo->main->start));
+	initial_delay(philo);
 	while (!read_died(philo) && philo->meals)
-	// while (!read_died(philo) && handle_meals(philo))
 	{
-		if (philo->meals && !read_died(philo) && time_up(philo))
-			return (die(philo), NULL);
-		if (philo->meals && philo->id % 2 == 0 && read_even(philo))
-			handle_eat(philo, 1);
-		if (philo->meals && philo->id % 2 != 0 && !read_even(philo))
-		{
-			set_even(philo, 0);
-			eat(philo);
-			set_even(philo, 1);
-		}
-		if (philo->eaten && philo->meals && !read_died(philo)
-				&& (philo->eaten) && sleeping(philo))
+		printf("MEALS%d: %d\n",philo->id, philo->meals);
+		eat(philo);
+		if (!read_died(philo) && philo->meals
+				&& sleeping(philo))
 			thinking(philo);
 	}
-	pthread_mutex_lock(&(philo->main->died_mtx));
-	philo->main->died = 1;
-	pthread_mutex_unlock(&(philo->main->died_mtx));
 	return NULL;
 }
 
@@ -368,7 +395,7 @@ int init_part_two(main_info **main)
 
 	i = -1;
 	gettimeofday(&((*main)->cur), NULL);
-	pthread_mutex_lock(&(*main)->synchro);
+	pthread_mutex_lock(&(*main)->start);
 	while (++i < (*main)->num_philos)
 	{
 		// printf("NA LOS EX\n");
@@ -377,9 +404,9 @@ int init_part_two(main_info **main)
 		set_start(&(*main)->philos[i]);
 		if (pthread_create(&(*main)->philos[i].thread_id, NULL,
 			start, &(*main)->philos[i]) != 0)
-			return (pthread_mutex_unlock(&(*main)->synchro), printf("Error: pthread_create\n"), 1);
+			return (pthread_mutex_unlock(&(*main)->start), printf("Error: pthread_create\n"), 1);
 	}
-	pthread_mutex_unlock(&(*main)->synchro);
+	pthread_mutex_unlock(&(*main)->start);
 	// usleep(1000);
 	// printf("writing.. \n");
 	// pthread_mutex_lock(&(*main)->synchro);
@@ -417,7 +444,6 @@ int init_part_one(main_info **main)
 		(*main)->philos[i].main = *main;
 	}
 	calc_tresh(*main);
-	printf("TRESH: %d\n", (*main)->tresh);
 	return (0);
 }
 
@@ -434,7 +460,6 @@ int init(main_info *main, int *argv)
 	main->eat = argv[2];
 	main->sleep = argv[3];
 	main->meals = argv[4];
-	// printf("MEALS START: %d\n", main->meals);
 	main->even = 1;
 	main->died = 0;
 	if (pthread_mutex_init(&main->synchro, NULL) != 0)
@@ -445,6 +470,8 @@ int init(main_info *main, int *argv)
 		return (printf("Error: pthread_mutex_init\n"), 1);
 	if (pthread_mutex_init(&main->even_mtx, NULL) != 0)
 		return (printf("Error: pthread_mutex_init\n"), 1);
+	if (pthread_mutex_init(&main->start, NULL) != 0)
+		return (printf("Error: pthread_mutex_init\n"), 1);
 	if (init_part_one(&main) != 0)
 		return (1);
 	if (init_part_two(&main) != 0)
@@ -452,12 +479,43 @@ int init(main_info *main, int *argv)
 	return (0);
 }
 
+int	check_died(main_info *main)
+{
+	int i;
+	int count;
+	t_time	cur;
+
+	i = -1;
+	count = main->num_philos;
+	while (++i < main->num_philos && count)
+	{
+		if (main->philos[i].meals == 0)
+			count--;
+		if (!count)
+			break;
+		if (main->philos[i].meals && time_up(&main->philos[i]))
+		{
+			gettimeofday(&cur, NULL);
+			printf("%ld: %d died\n", ((size_t)cur.tv_sec * 1000
+			+ (size_t)cur.tv_usec / 1000) - ((size_t)(main->cur).tv_sec
+			* 1000 + (size_t)(main->cur).tv_usec / 1000), main->philos[i].id);
+			return (1);
+		}
+	}
+	return (0);
+}
+
 int run_the_rest(main_info *main)
 {
 	int i;
 
-	while (!(read_died(&main->philos[0])))
-		usleep(100);
+	pthread_mutex_lock(&main->start);
+	pthread_mutex_unlock(&main->start);
+	while (!(check_died(main)))
+		usleep(1000);
+	pthread_mutex_lock(&main->died_mtx);
+	main->died = 1;
+	pthread_mutex_unlock(&main->died_mtx);
 	i = -1;
 	while (++i < main->num_philos)
 	{
@@ -476,8 +534,12 @@ int run_the_rest(main_info *main)
 		return (1);
 	if (pthread_mutex_destroy(&main->died_mtx) != 0)
 		return (1);
+	if (pthread_mutex_destroy(&main->meals_mtx) != 0)
+		return (1);
 		// return (printf("Error: pthread_mutex_destroy\n"), 1);
 	if (pthread_mutex_destroy(&main->even_mtx) != 0)
+		return (1);
+	if (pthread_mutex_destroy(&main->start) != 0)
 		return (1);
 		// return (printf("Error: pthread_mutex_destroy\n"), 1);
 	free(main->philos);
