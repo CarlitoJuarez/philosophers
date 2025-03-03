@@ -114,6 +114,9 @@ int possible(t_philo *philo)
 
 int lock_forks(t_philo *philo)
 {
+	pthread_mutex_lock(&philo->main->synchro);
+	printf("WAITING FOR LOCK: %d\n", philo->id);
+	pthread_mutex_unlock(&philo->main->synchro);
 	if (philo->left->fork_id == philo->right->fork_id)
 	{
 		pthread_mutex_lock(&philo->left->fork);
@@ -124,15 +127,27 @@ int lock_forks(t_philo *philo)
 	{
 		pthread_mutex_lock(&philo->left->fork);
 		print_timestamp_fork(philo);
+		pthread_mutex_lock(&philo->main->synchro);
+		printf("LOCK: %d FROM: %d\n", philo->left->fork_id, philo->id);
+		pthread_mutex_unlock(&philo->main->synchro);
 		pthread_mutex_lock(&philo->right->fork);
 		print_timestamp_fork(philo);
+		pthread_mutex_lock(&philo->main->synchro);
+		printf("LOCK: %d FROM: %d\n", philo->right->fork_id, philo->id);
+		pthread_mutex_unlock(&philo->main->synchro);
 	}
 	else if (!read_died(philo) && read_meals(philo))
 	{
 		pthread_mutex_lock(&philo->right->fork);
 		print_timestamp_fork(philo);
+		pthread_mutex_lock(&philo->main->synchro);
+		printf("LOCK: %d FROM: %d\n", philo->right->fork_id, philo->id);
+		pthread_mutex_unlock(&philo->main->synchro);
 		pthread_mutex_lock(&philo->left->fork);
 		print_timestamp_fork(philo);
+		pthread_mutex_lock(&philo->main->synchro);
+		printf("LOCK: %d FROM: %d\n", philo->left->fork_id, philo->id);
+		pthread_mutex_unlock(&philo->main->synchro);
 	}
 	return (1);
 }
@@ -145,6 +160,23 @@ void	custom_usleep(long long time_in_ms,t_philo *philo)
 	while (!read_died(philo)
 		&& (get_time_in_ms() - start_time) < time_in_ms)
 		usleep(100);
+}
+
+int read_even(t_philo *philo)
+{
+	int val;
+
+	pthread_mutex_lock(&philo->main->even_mtx);
+	val = philo->main->even;
+	pthread_mutex_unlock(&philo->main->even_mtx);
+	return (val);
+}
+
+void set_even(t_philo *philo, int val)
+{
+	pthread_mutex_lock(&philo->main->even_mtx);
+	philo->main->even = val;
+	pthread_mutex_unlock(&philo->main->even_mtx);
 }
 
 void	eat(t_philo *philo)
@@ -166,10 +198,38 @@ void	eat(t_philo *philo)
 						+ (size_t)(philo->main->cur).tv_usec / 1000), philo->id);
 		}
 		pthread_mutex_unlock(&philo->main->synchro);
-		custom_usleep(philo->main->eat, philo);
-		pthread_mutex_unlock(&philo->right->fork);
-		pthread_mutex_unlock(&philo->left->fork);
+		// custom_usleep(philo->main->eat, philo);
+		usleep(philo->main->eat * 1000);
+		if (philo->id % 2 == 0)
+		{
+			pthread_mutex_unlock(&philo->right->fork);
+			pthread_mutex_lock(&philo->main->synchro);
+			printf("UNLOCK: %d FROM: %d\n", philo->left->fork_id, philo->id);
+			pthread_mutex_unlock(&philo->main->synchro);
+			pthread_mutex_unlock(&philo->left->fork);
+			pthread_mutex_lock(&philo->main->synchro);
+			printf("UNLOCK: %d FROM: %d\n", philo->right->fork_id, philo->id);
+			pthread_mutex_unlock(&philo->main->synchro);
+		}
+		else
+		{
+			pthread_mutex_unlock(&philo->left->fork);
+			pthread_mutex_lock(&philo->main->synchro);
+			printf("UNLOCK: %d FROM: %d\n", philo->right->fork_id, philo->id);
+			pthread_mutex_unlock(&philo->main->synchro);
+			pthread_mutex_unlock(&philo->right->fork);
+			pthread_mutex_lock(&philo->main->synchro);
+			printf("UNLOCK: %d FROM: %d\n", philo->left->fork_id, philo->id);
+			pthread_mutex_unlock(&philo->main->synchro);
+		}
+		// pthread_mutex_unlock(&philo->right->fork);
+		// pthread_mutex_lock(&philo->main->synchro);
+		// printf("UNLOCK: %d FROM: %d\n", philo->left->fork_id, philo->id);
+		// pthread_mutex_unlock(&philo->main->synchro);
 	}
+	// pthread_mutex_lock(&philo->main->synchro);
+	// printf("FINISHE EATING: %d\n", philo->id);
+	// pthread_mutex_unlock(&philo->main->synchro);
 }
 
 int	read_died(t_philo *philo)
@@ -260,6 +320,26 @@ void	initial_delay(t_philo *philo)
 		ft_usleep(200);
 }
 
+void plus_counter(t_philo *philo)
+{
+	pthread_mutex_lock(&(philo->main->counter_mtx));
+	philo->main->counter--;
+	pthread_mutex_unlock(&(philo->main->counter_mtx));
+}
+
+int read_counter(t_philo *philo)
+{
+	int val;
+
+	pthread_mutex_lock(&(philo->main->counter_mtx));
+	val = philo->main->counter;
+	pthread_mutex_unlock(&(philo->main->counter_mtx));
+	if (val <= 0)
+		return (0);
+	else
+		return (1);
+}
+
 void *start(void *arg)
 {
 	t_philo *philo;
@@ -270,11 +350,24 @@ void *start(void *arg)
 	initial_delay(philo);
 	while (!read_died(philo) && read_meals(philo))
 	{
-		// printf("MEALS%d: %d\n",philo->id, philo->meals);
+		// if ((philo->id % 2 == 0 && !read_even(philo))
+		// 	|| ((philo->id % 2 != 0
+		// 		// || (philo->main->num_philos % 2 != 0
+		// 		// 	&& philo->id == philo->main->num_philos))
+		// 		&& read_even(philo))))
+		// {
 		eat(philo);
+			// plus_counter(philo);
+			// if (philo->id % 2 == 0)
+			// else
+				// plus_counter(philo);
+			// if (!read_counter(philo))
+			// 	set_even(philo, 1);
+			// printf("EVEN: %d\n", read_even(philo));
 		if (!read_died(philo) && read_meals(philo)
 				&& sleeping(philo))
 			thinking(philo);
+		// }
 	}
 	return NULL;
 }
@@ -315,7 +408,7 @@ int init_part_one(main_info **main)
 	i = -1;
 	while (++i < (*main)->num_philos)
 	{
-		(*main)->forks[i].fork_id = i + 1;
+		(*main)->forks[i].fork_id = i;
 		if (pthread_mutex_init(&(*main)->forks[i].fork, NULL) != 0)
 			return (printf("Error: pthread_mutex_init\n"), 1);
 		if (pthread_mutex_init(&(*main)->philos[i].phil_mtx, NULL) != 0)
@@ -348,13 +441,19 @@ int init(main_info *main, int *argv)
 	if (!main->forks)
 		return (1);
 	main->num_philos = argv[0];
+	if (main->num_philos % 2 == 0)
+		main->counter = main->num_philos / 2;
+	else
+		main->counter = (main->num_philos - 1) / 2;
 	main->die = argv[1];
 	main->eat = argv[2];
 	main->sleep = argv[3];
 	main->meals = argv[4];
-	main->even = 1;
+	main->even = 0;
 	main->died = 0;
 	if (pthread_mutex_init(&main->synchro, NULL) != 0)
+		return (printf("Error: pthread_mutex_init\n"), 1);
+	if (pthread_mutex_init(&main->counter_mtx, NULL) != 0)
 		return (printf("Error: pthread_mutex_init\n"), 1);
 	if (pthread_mutex_init(&main->meals_mtx, NULL) != 0)
 		return (printf("Error: pthread_mutex_init\n"), 1);
@@ -434,6 +533,8 @@ int run_the_rest(main_info *main)
 		return (1);
 		// return (printf("Error: pthread_mutex_destroy\n"), 1);
 	if (pthread_mutex_destroy(&main->even_mtx) != 0)
+		return (1);
+	if (pthread_mutex_destroy(&main->counter_mtx) != 0)
 		return (1);
 	if (pthread_mutex_destroy(&main->start) != 0)
 		return (1);
