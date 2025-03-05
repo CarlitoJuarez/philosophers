@@ -2,7 +2,7 @@ NAME		= philo
 
 CC			= cc
 
-FLAGS		= -Wall -Wextra -Werror -g -lpthread
+FLAGS		= -Wall -Wextra -Werror -g -pthread
 RM			= rm -rf
 
 HEADER		= philosophers.h

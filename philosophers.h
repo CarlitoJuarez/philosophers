@@ -62,6 +62,7 @@ typedef struct main_info
     t_mtx   meals_mtx;
     t_mtx   counter_mtx;
     t_mtx   start;
+    t_mtx   out;
 
     int     died;
     int     even;
@@ -75,7 +76,7 @@ typedef struct main_info
     int     eat;
     int     sleep;
     int     meals;
-    t_time      cur;
+    size_t      cur;
 
 } main_info;
 
