@@ -145,18 +145,16 @@ void calc_tresh(main_info *main)
 	int tresh_2;
 
 	if (main->num_philos % 2 == 0)
-		tresh_2 = main->die - (main->eat + main->sleep);
+		tresh_2 = main->die - (main->eat * 2);
 	else
 		tresh_2 = main->die - (main->eat * 2 + main->sleep);
-	if (tresh_2 < 1)
+	if (tresh_2 < 1 || main->num_philos < 10)
 	{
 		main->tresh = 0;
 		return ;
 	}
 	while (tresh_2 > 30)
 		tresh_2 /= (tresh_2 / 10);
-	if (main->num_philos < 10)
-		main->tresh = 1;
 	if (tresh_2 <= 2)
 		main->tresh = 5;
 	printf("TRESH2: %d\n", tresh_2);
@@ -200,7 +198,7 @@ int	time_up(t_philo *philo)
 	// 							+ philo->main->die + philo->main->tresh);
 	if (((size_t)cur.tv_sec * 1000 + (size_t)cur.tv_usec / 1000)
 					- main
-					> philo->last_meal - main
+					> read_last(philo) - main
 					+ philo->main->die + philo->main->tresh)
 		return (
 				// printf("THIS DIED: %lu > %lu\n", ((size_t)cur.tv_sec * 1000 + (size_t)cur.tv_usec / 1000)
@@ -417,7 +415,7 @@ void *start(void *arg)
 	while (!read_died(philo) && read_meals(philo))
 	{
 
-		if (!philo->eaten && philo->id % 2 == 0 && read_even(philo) == 1)
+		if ((!philo->eaten && philo->id % 2 == 0 && read_even(philo) == 1) || philo->main->num_philos == 1)
 		{
 			eat(philo);
 			if (philo->id == philo->main->num_philos || philo->id == philo->main->num_philos - 1)
@@ -580,7 +578,7 @@ int	check_died(main_info *main)
 			gettimeofday(&cur, NULL);
 			pthread_mutex_lock(&main->out);
 			printf("%ld: %d died\n", ((size_t)cur.tv_sec * 1000
-			+ (size_t)cur.tv_usec / 1000) - main->cur, main->philos[i].id);
+			+ (size_t)cur.tv_usec / 1000) - get_main_time(&main->philos[0]), main->philos[i].id);
 			pthread_mutex_unlock(&main->out);
 			return (1);
 		}
